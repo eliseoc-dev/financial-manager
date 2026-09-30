@@ -230,3 +230,76 @@ def get_expenses_by_category(
         )
         for row in rows
     ]
+
+
+def filter_transactions_by_type(
+    connection: sqlite3.Connection,
+    transaction_type: str,
+) -> list[Transaction]:
+    rows = connection.execute(
+        """
+        SELECT
+            id,
+            transaction_type,
+            amount_cents,
+            category,
+            description,
+            transaction_date
+        FROM transactions
+        WHERE transaction_type = ?
+        ORDER BY transaction_date DESC, id DESC
+        """,
+        (transaction_type,),
+    ).fetchall()
+
+    return [_row_to_transaction(row) for row in rows]
+
+
+def filter_transactions_by_category(
+    connection: sqlite3.Connection,
+    category: str,
+) -> list[Transaction]:
+    rows = connection.execute(
+        """
+        SELECT
+            id,
+            transaction_type,
+            amount_cents,
+            category,
+            description,
+            transaction_date
+        FROM transactions
+        WHERE category = ?
+        ORDER BY transaction_date DESC, id DESC
+        """,
+        (category,),
+    ).fetchall()
+
+    return [_row_to_transaction(row) for row in rows]
+
+
+def filter_transactions_by_date_range(
+    connection: sqlite3.Connection,
+    start_date: date,
+    end_date: date,
+) -> list[Transaction]:
+    rows = connection.execute(
+        """
+        SELECT
+            id,
+            transaction_type,
+            amount_cents,
+            category,
+            description,
+            transaction_date
+        FROM transactions
+        WHERE transaction_date BETWEEN ? AND ?
+        ORDER BY transaction_date DESC, id DESC
+        """,
+        (
+            start_date.isoformat(),
+            end_date.isoformat(),
+        ),
+    ).fetchall()
+
+    return [_row_to_transaction(row) for row in rows]
