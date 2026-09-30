@@ -2,7 +2,7 @@ import sqlite3
 from datetime import date
 from decimal import Decimal
 
-from .models import Transaction
+from .models import CategorySummary, FinancialSummary, Transaction
 from .validators import validate_transaction
 
 
@@ -160,3 +160,73 @@ def delete_transaction(
 
     if cursor.rowcount == 0:
         raise ValueError("Transaction not found.")
+
+
+def get_financial_summary(
+    connection: sqlite3.Connection,
+) -> FinancialSummary:
+    row = connection.execute(
+        """
+        SELECT
+            COALESCE(
+                SUM(
+                    CASE
+                        WHEN transaction_type = 'income'
+                        THEN amount_cents
+                        ELSE 0
+                    END
+                ),
+                0
+            ) AS total_income,
+
+            COALESCE(
+                SUM(
+                    CASE
+                        WHEN transaction_type = 'expense'
+                        THEN amount_cents
+                        ELSE 0
+                    END
+                ),
+                0
+            ) AS total_expenses,
+
+            COUNT(*) AS transaction_count
+        FROM transactions
+        """
+    ).fetchone()
+
+    total_income = Decimal(row["total_income"]) / Decimal("100")
+    total_expenses = Decimal(row["total_expenses"]) / Decimal("100")
+
+    return FinancialSummary(
+        total_income=total_income,
+        total_expenses=total_expenses,
+        balance=total_income - total_expenses,
+        transaction_count=row["transaction_count"],
+    )
+
+
+def get_expenses_by_category(
+    connection: sqlite3.Connection,
+) -> list[CategorySummary]:
+    rows = connection.execute(
+        """
+        SELECT
+            category,
+            SUM(amount_cents) AS total,
+            COUNT(*) AS transaction_count
+        FROM transactions
+        WHERE transaction_type = 'expense'
+        GROUP BY category
+        ORDER BY total DESC
+        """
+    ).fetchall()
+
+    return [
+        CategorySummary(
+            category=row["category"],
+            total=Decimal(row["total"]) / Decimal("100"),
+            transaction_count=row["transaction_count"],
+        )
+        for row in rows
+    ]

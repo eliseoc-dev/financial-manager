@@ -11,3 +11,18 @@ class Transaction:
     category: str
     description: str
     transaction_date: date
+
+
+@dataclass
+class FinancialSummary:
+    total_income: Decimal
+    total_expenses: Decimal
+    balance: Decimal
+    transaction_count: int
+
+
+@dataclass
+class CategorySummary:
+    category: str
+    total: Decimal
+    transaction_count: int
