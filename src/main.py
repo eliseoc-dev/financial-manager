@@ -2,7 +2,7 @@ def main():
     print("================================")
     print("FINANCIAL MANAGER")
     print("================================")
-    print("Proyecto 1 iniciado.")
+    print("Proyecto iniciado.")
 
 
 if __name__ == "__main__":

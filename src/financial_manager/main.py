@@ -8,15 +8,17 @@ from .services import (
     get_all_transactions,
     get_summary,
     get_transactions_by_category,
+    get_transactions_by_date_range,
+    get_transactions_by_type,
     remove_transaction,
 )
 
 
 def print_header() -> None:
     print()
-    print("=" * 40)
+    print("=" * 50)
     print("FINANCIAL MANAGER")
-    print("=" * 40)
+    print("=" * 50)
 
 
 def print_menu() -> None:
@@ -25,7 +27,7 @@ def print_menu() -> None:
     print("2. Register expense")
     print("3. List transactions")
     print("4. View financial summary")
-    print("5. Filter by category")
+    print("5. Filter transactions")
     print("6. Edit transaction")
     print("7. Delete transaction")
     print("0. Exit")
@@ -49,15 +51,71 @@ def read_amount() -> Decimal:
             print("Invalid amount. Example: 25.50")
 
 
-def read_date() -> date:
+def read_date(prompt: str = "Date (YYYY-MM-DD): ") -> date:
     while True:
-        value = input("Date (YYYY-MM-DD): ").strip()
+        value = input(prompt).strip()
 
         try:
             return date.fromisoformat(value)
 
         except ValueError:
             print("Invalid date. Example: 2026-09-30")
+
+
+def read_transaction_id(prompt: str) -> int:
+    while True:
+        value = input(prompt).strip()
+
+        try:
+            transaction_id = int(value)
+
+            if transaction_id <= 0:
+                print("ID must be greater than zero.")
+                continue
+
+            return transaction_id
+
+        except ValueError:
+            print("Invalid ID. Enter a number.")
+
+
+def read_transaction_type() -> str:
+    while True:
+        transaction_type = input(
+            "Type (income/expense): "
+        ).strip().lower()
+
+        if transaction_type in {"income", "expense"}:
+            return transaction_type
+
+        print("Invalid type. Use 'income' or 'expense'.")
+
+
+def print_transaction(transaction) -> None:
+    print(
+        f"[{transaction.id}] "
+        f"{transaction.transaction_date} | "
+        f"{transaction.transaction_type.upper()} | "
+        f"${transaction.amount:.2f} | "
+        f"{transaction.category} | "
+        f"{transaction.description}"
+    )
+
+
+def print_transactions(
+    transactions,
+    title: str = "TRANSACTIONS",
+) -> None:
+    print()
+    print(title)
+    print("-" * 50)
+
+    if not transactions:
+        print("No transactions found.")
+        return
+
+    for transaction in transactions:
+        print_transaction(transaction)
 
 
 def create_transaction_flow(
@@ -83,36 +141,24 @@ def create_transaction_flow(
         )
 
         print()
-        print(f"Transaction created successfully. ID: {transaction.id}")
+        print(
+            "Transaction created successfully. "
+            f"ID: {transaction.id}"
+        )
 
-    except ValueError as error:
+    except (ValueError, RuntimeError) as error:
         print(f"Error: {error}")
 
 
-def print_transaction(transaction) -> None:
-    print(
-        f"[{transaction.id}] "
-        f"{transaction.transaction_date} | "
-        f"{transaction.transaction_type.upper()} | "
-        f"${transaction.amount:.2f} | "
-        f"{transaction.category} | "
-        f"{transaction.description}"
+def list_transactions_flow(connection) -> None:
+    transactions = get_all_transactions(
+        connection
     )
 
-
-def list_transactions_flow(connection) -> None:
-    transactions = get_all_transactions(connection)
-
-    print()
-    print("TRANSACTIONS")
-    print("-" * 40)
-
-    if not transactions:
-        print("No transactions found.")
-        return
-
-    for transaction in transactions:
-        print_transaction(transaction)
+    print_transactions(
+        transactions,
+        "ALL TRANSACTIONS",
+    )
 
 
 def summary_flow(connection) -> None:
@@ -120,50 +166,151 @@ def summary_flow(connection) -> None:
 
     print()
     print("FINANCIAL SUMMARY")
-    print("-" * 40)
-    print(f"Total income:   ${summary.total_income:.2f}")
-    print(f"Total expenses: ${summary.total_expenses:.2f}")
-    print(f"Balance:        ${summary.balance:.2f}")
-    print(f"Transactions:   {summary.transaction_count}")
+    print("-" * 50)
+    print(
+        f"Total income:   "
+        f"${summary.total_income:.2f}"
+    )
+    print(
+        f"Total expenses: "
+        f"${summary.total_expenses:.2f}"
+    )
+    print(
+        f"Balance:        "
+        f"${summary.balance:.2f}"
+    )
+    print(
+        f"Transactions:   "
+        f"{summary.transaction_count}"
+    )
 
 
 def category_filter_flow(connection) -> None:
-    category = input("Category: ").strip()
+    category = input(
+        "Category: "
+    ).strip()
+
+    if not category:
+        print("Category cannot be empty.")
+        return
 
     transactions = get_transactions_by_category(
         connection,
         category,
     )
 
+    print_transactions(
+        transactions,
+        f"CATEGORY: {category}",
+    )
+
+
+def type_filter_flow(connection) -> None:
+    transaction_type = read_transaction_type()
+
+    transactions = get_transactions_by_type(
+        connection,
+        transaction_type,
+    )
+
+    print_transactions(
+        transactions,
+        f"TYPE: {transaction_type.upper()}",
+    )
+
+
+def date_range_filter_flow(connection) -> None:
     print()
-    print(f"CATEGORY: {category}")
-    print("-" * 40)
+    print("FILTER BY DATE RANGE")
 
-    if not transactions:
-        print("No transactions found.")
-        return
+    start_date = read_date(
+        "Start date (YYYY-MM-DD): "
+    )
 
-    for transaction in transactions:
-        print_transaction(transaction)
+    end_date = read_date(
+        "End date (YYYY-MM-DD): "
+    )
+
+    try:
+        transactions = (
+            get_transactions_by_date_range(
+                connection,
+                start_date,
+                end_date,
+            )
+        )
+
+        print_transactions(
+            transactions,
+            (
+                f"TRANSACTIONS FROM "
+                f"{start_date} TO {end_date}"
+            ),
+        )
+
+    except ValueError as error:
+        print(f"Error: {error}")
+
+
+def filter_transactions_flow(connection) -> None:
+    while True:
+        print()
+        print("FILTER TRANSACTIONS")
+        print("-" * 50)
+        print("1. By category")
+        print("2. By type")
+        print("3. By date range")
+        print("0. Back")
+        print()
+
+        option = input(
+            "Choose a filter: "
+        ).strip()
+
+        match option:
+            case "1":
+                category_filter_flow(
+                    connection
+                )
+
+            case "2":
+                type_filter_flow(
+                    connection
+                )
+
+            case "3":
+                date_range_filter_flow(
+                    connection
+                )
+
+            case "0":
+                break
+
+            case _:
+                print("Invalid option.")
 
 
 def edit_transaction_flow(connection) -> None:
+    transaction_id = read_transaction_id(
+        "Transaction ID to edit: "
+    )
+
+    print("Enter the new transaction data.")
+
+    transaction_type = read_transaction_type()
+    amount = read_amount()
+
+    category = input(
+        "Category: "
+    ).strip()
+
+    description = input(
+        "Description: "
+    ).strip()
+
+    transaction_date = read_date()
+
     try:
-        transaction_id = int(
-            input("Transaction ID to edit: ").strip()
-        )
-
-        print("Enter the new transaction data.")
-
-        transaction_type = input(
-            "Type (income/expense): "
-        ).strip().lower()
-
-        amount = read_amount()
-        category = input("Category: ").strip()
-        description = input("Description: ").strip()
-        transaction_date = read_date()
-
         transaction = edit_transaction(
             connection=connection,
             transaction_id=transaction_id,
@@ -175,33 +322,38 @@ def edit_transaction_flow(connection) -> None:
         )
 
         print()
-        print("Transaction updated successfully.")
+        print(
+            "Transaction updated successfully."
+        )
         print_transaction(transaction)
 
-    except ValueError as error:
+    except (ValueError, RuntimeError) as error:
         print(f"Error: {error}")
 
 
 def delete_transaction_flow(connection) -> None:
+    transaction_id = read_transaction_id(
+        "Transaction ID to delete: "
+    )
+
+    confirmation = input(
+        f"Delete transaction "
+        f"{transaction_id}? (y/n): "
+    ).strip().lower()
+
+    if confirmation != "y":
+        print("Deletion cancelled.")
+        return
+
     try:
-        transaction_id = int(
-            input("Transaction ID to delete: ").strip()
-        )
-
-        confirmation = input(
-            f"Delete transaction {transaction_id}? (y/n): "
-        ).strip().lower()
-
-        if confirmation != "y":
-            print("Deletion cancelled.")
-            return
-
         remove_transaction(
             connection,
             transaction_id,
         )
 
-        print("Transaction deleted successfully.")
+        print(
+            "Transaction deleted successfully."
+        )
 
     except ValueError as error:
         print(f"Error: {error}")
@@ -211,12 +363,13 @@ def run() -> None:
     initialize_database()
 
     with get_connection() as connection:
-
         while True:
             print_header()
             print_menu()
 
-            option = input("Choose an option: ").strip()
+            option = input(
+                "Choose an option: "
+            ).strip()
 
             match option:
                 case "1":
@@ -232,19 +385,29 @@ def run() -> None:
                     )
 
                 case "3":
-                    list_transactions_flow(connection)
+                    list_transactions_flow(
+                        connection
+                    )
 
                 case "4":
-                    summary_flow(connection)
+                    summary_flow(
+                        connection
+                    )
 
                 case "5":
-                    category_filter_flow(connection)
+                    filter_transactions_flow(
+                        connection
+                    )
 
                 case "6":
-                    edit_transaction_flow(connection)
+                    edit_transaction_flow(
+                        connection
+                    )
 
                 case "7":
-                    delete_transaction_flow(connection)
+                    delete_transaction_flow(
+                        connection
+                    )
 
                 case "0":
                     print()
